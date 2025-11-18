@@ -1,281 +1,317 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 
-interface Tab {
+interface RecentWindow {
   id: string;
   title: string;
   url: string;
-  isLoading: boolean;
-  favicon?: string;
+  lastAccessed: Date;
 }
 
-const tabs = ref<Tab[]>([]);
-const activeTabId = ref<string | null>(null);
-const urlInput = ref("https://example.com");
+interface Favorite {
+  id: string;
+  title: string;
+  url: string;
+}
+
+const recentWindows = ref<RecentWindow[]>([]);
+const favorites = ref<Favorite[]>([]);
+const newFavoriteUrl = ref("");
 const errorMessage = ref("");
+const isLoading = ref(false);
 
-const activeTab = computed(() => 
-  tabs.value.find(tab => tab.id === activeTabId.value)
-);
-
-const createNewTab = async (url: string, title?: string) => {
-  const tabId = `tab-${Date.now()}`;
-  const tab: Tab = {
-    id: tabId,
-    title: title || new URL(url).hostname,
-    url,
-    isLoading: true,
-    favicon: undefined
-  };
-
-  tabs.value.push(tab);
-  activeTabId.value = tabId;
-
+// メイン機能
+const openScrapboxHome = async () => {
   try {
-    // Create the webview content in this tab
-    await invoke('create_tab_content', { 
-      tabId,
-      url
-    });
-    
-    // Update tab title based on page content (simplified)
-    if (url.includes('scrapbox.io')) {
-      tab.title = url.includes('/') ? 
-        url.split('/').pop() || 'Scrapbox' : 'Scrapbox';
-    }
-    
-    // Set a timeout to stop loading animation
-    setTimeout(() => {
-      tab.isLoading = false;
-    }, 2000);
-    
-  } catch (error) {
-    console.error('Failed to create tab:', error);
-    errorMessage.value = `Failed to create tab: ${error}`;
-    tab.isLoading = false;
-    // Remove failed tab
-    tabs.value = tabs.value.filter(t => t.id !== tabId);
-    activeTabId.value = tabs.value.length > 0 ? tabs.value[tabs.value.length - 1].id : null;
-  }
-};
-
-const handleIframeError = (tabId: string) => {
-  const tab = tabs.value.find(t => t.id === tabId);
-  if (tab) {
-    tab.isLoading = false;
-    errorMessage.value = `このサイトはiframeでの表示が制限されています。ブラウザで開くボタンを使用してください。`;
-  }
-};
-
-const openTabInNewWindow = async (tabId: string) => {
-  const tab = tabs.value.find(t => t.id === tabId);
-  if (tab) {
-    try {
-      await invoke('create_webview_window', { 
-        url: tab.url,
-        label: `window-${tabId}`
-      });
-    } catch (error) {
-      console.error('Failed to open in new window:', error);
-      errorMessage.value = `Failed to open in new window: ${error}`;
-    }
-  }
-};
-
-// Scrapbox用の専用機能
-const openScrapboxTab = async () => {
-  const scrapboxUrl = "https://scrapbox.io";
-  try {
+    isLoading.value = true;
+    const windowId = `scrapbox-home-${Date.now()}`;
     await invoke('create_webview_window', { 
-      url: scrapboxUrl,
-      label: `scrapbox-${Date.now()}`
+      url: "https://scrapbox.io",
+      label: windowId
     });
-    errorMessage.value = "ScrapboxページをWebViewウィンドウで開きました";
+    
+    // 履歴に追加
+    addToRecent({
+      id: windowId,
+      title: "Scrapbox Home",
+      url: "https://scrapbox.io",
+      lastAccessed: new Date()
+    });
+    
+    errorMessage.value = "";
   } catch (error) {
     console.error('Failed to open Scrapbox:', error);
     errorMessage.value = `Scrapboxの起動に失敗しました: ${error}`;
+  } finally {
+    isLoading.value = false;
   }
 };
 
-const closeTab = (tabId: string) => {
-  const tabIndex = tabs.value.findIndex(tab => tab.id === tabId);
-  if (tabIndex === -1) return;
-
-  // Remove tab
-  tabs.value.splice(tabIndex, 1);
-
-  // Update active tab
-  if (activeTabId.value === tabId) {
-    if (tabs.value.length > 0) {
-      // Switch to previous tab or first available
-      const newActiveIndex = Math.max(0, tabIndex - 1);
-      activeTabId.value = tabs.value[newActiveIndex]?.id || null;
-    } else {
-      activeTabId.value = null;
-    }
-  }
-
-  // Notify backend to clean up
-  invoke('close_tab', { tabId }).catch(console.error);
-};
-
-const switchTab = (tabId: string) => {
-  activeTabId.value = tabId;
-  // Notify backend about tab switch
-  invoke('switch_to_tab', { tabId }).catch(console.error);
-};
-
-const navigateActiveTab = async () => {
-  if (!activeTab.value) {
-    // Create new tab if none exists
-    await createNewTab(urlInput.value);
-    return;
-  }
-
+const openScrapboxProject = async (projectName: string) => {
   try {
-    activeTab.value.isLoading = true;
-    errorMessage.value = "";
-    activeTab.value.url = urlInput.value;
-    
-    await invoke('navigate_tab', { 
-      tabId: activeTab.value.id,
-      url: urlInput.value
+    const url = `https://scrapbox.io/${projectName}`;
+    const windowId = `scrapbox-${projectName}-${Date.now()}`;
+    await invoke('create_webview_window', { 
+      url,
+      label: windowId
     });
     
-    // Update tab title
-    activeTab.value.title = new URL(urlInput.value).hostname;
+    addToRecent({
+      id: windowId,
+      title: `Scrapbox - ${projectName}`,
+      url,
+      lastAccessed: new Date()
+    });
     
+    errorMessage.value = "";
   } catch (error) {
-    console.error('Navigation error:', error);
-    errorMessage.value = `Navigation failed: ${error}`;
-  } finally {
-    if (activeTab.value) {
-      activeTab.value.isLoading = false;
-    }
+    console.error('Failed to open Scrapbox project:', error);
+    errorMessage.value = `プロジェクトの起動に失敗しました: ${error}`;
   }
 };
 
-const addNewTab = async () => {
-  await createNewTab("https://example.com");
-  urlInput.value = "https://example.com";
+const openCustomProject = async () => {
+  const projectName = prompt("Scrapboxプロジェクト名を入力してください:");
+  if (projectName) {
+    await openScrapboxProject(projectName);
+  }
 };
 
-const goHome = async () => {
-  urlInput.value = "https://example.com";
-  await navigateActiveTab();
+// 履歴管理
+const addToRecent = (window: RecentWindow) => {
+  // 重複を削除
+  recentWindows.value = recentWindows.value.filter(w => w.id !== window.id);
+  // 先頭に追加
+  recentWindows.value.unshift(window);
+  // 最大10件まで保持
+  if (recentWindows.value.length > 10) {
+    recentWindows.value = recentWindows.value.slice(0, 10);
+  }
+  saveToStorage();
 };
 
-const openInBrowser = async () => {
+const reopenWindow = async (window: RecentWindow) => {
   try {
-    const url = activeTab.value?.url || urlInput.value;
-    await invoke('open_url', { url });
+    const windowId = `reopen-${Date.now()}`;
+    await invoke('create_webview_window', { 
+      url: window.url,
+      label: windowId
+    });
+    
+    // 履歴を更新
+    addToRecent({
+      ...window,
+      id: windowId,
+      lastAccessed: new Date()
+    });
+    
+    errorMessage.value = "";
   } catch (error) {
-    console.error('Failed to open in browser:', error);
-    errorMessage.value = `Failed to open in browser: ${error}`;
+    console.error('Failed to reopen window:', error);
+    errorMessage.value = `ウィンドウの再起動に失敗しました: ${error}`;
   }
 };
 
-const refresh = async () => {
-  if (activeTab.value) {
-    urlInput.value = activeTab.value.url;
-    await navigateActiveTab();
+const removeFromRecent = (windowId: string) => {
+  recentWindows.value = recentWindows.value.filter(w => w.id !== windowId);
+  saveToStorage();
+};
+
+// お気に入り管理
+const addFavorite = () => {
+  if (!newFavoriteUrl.value.trim()) return;
+  
+  try {
+    const url = new URL(newFavoriteUrl.value);
+    const favorite: Favorite = {
+      id: `fav-${Date.now()}`,
+      title: url.pathname.split('/').filter(p => p).pop() || url.hostname,
+      url: newFavoriteUrl.value
+    };
+    
+    favorites.value.push(favorite);
+    newFavoriteUrl.value = "";
+    saveToStorage();
+    errorMessage.value = "";
+  } catch (error) {
+    errorMessage.value = "有効なURLを入力してください";
   }
 };
 
-onMounted(async () => {
-  // Create initial tab with a site that allows iframe embedding
-  await createNewTab("https://example.com", "Example");
+const openFavorite = async (favorite: Favorite) => {
+  try {
+    const windowId = `favorite-${Date.now()}`;
+    await invoke('create_webview_window', { 
+      url: favorite.url,
+      label: windowId
+    });
+    
+    addToRecent({
+      id: windowId,
+      title: favorite.title,
+      url: favorite.url,
+      lastAccessed: new Date()
+    });
+    
+    errorMessage.value = "";
+  } catch (error) {
+    console.error('Failed to open favorite:', error);
+    errorMessage.value = `お気に入りの起動に失敗しました: ${error}`;
+  }
+};
+
+const removeFavorite = (favoriteId: string) => {
+  favorites.value = favorites.value.filter(f => f.id !== favoriteId);
+  saveToStorage();
+};
+
+// ユーティリティ
+const formatTime = (date: Date) => {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  
+  if (minutes < 1) return "たった今";
+  if (minutes < 60) return `${minutes}分前`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)}時間前`;
+  return date.toLocaleDateString();
+};
+
+const refreshData = () => {
+  loadFromStorage();
+  errorMessage.value = "データを更新しました";
+  setTimeout(() => {
+    errorMessage.value = "";
+  }, 2000);
+};
+
+// データ永続化
+const saveToStorage = () => {
+  localStorage.setItem('sbe-recent', JSON.stringify(recentWindows.value.map(w => ({
+    ...w,
+    lastAccessed: w.lastAccessed.toISOString()
+  }))));
+  localStorage.setItem('sbe-favorites', JSON.stringify(favorites.value));
+};
+
+const loadFromStorage = () => {
+  try {
+    const recentData = localStorage.getItem('sbe-recent');
+    if (recentData) {
+      const parsed = JSON.parse(recentData);
+      recentWindows.value = parsed.map((w: any) => ({
+        ...w,
+        lastAccessed: new Date(w.lastAccessed)
+      }));
+    }
+    
+    const favData = localStorage.getItem('sbe-favorites');
+    if (favData) {
+      favorites.value = JSON.parse(favData);
+    }
+  } catch (error) {
+    console.error('Failed to load from storage:', error);
+  }
+};
+
+onMounted(() => {
+  loadFromStorage();
+  
+  // サンプルのお気に入りを追加（初回のみ）
+  if (favorites.value.length === 0) {
+    favorites.value = [
+      {
+        id: 'sample-1',
+        title: 'Scrapbox ヘルプ',
+        url: 'https://scrapbox.io/help-jp'
+      }
+    ];
+    saveToStorage();
+  }
 });
 </script>
 
 <template>
   <div class="app-container">
     <header class="app-header">
-      <div class="nav-controls">
-        <button @click="refresh" class="nav-btn" title="更新" :disabled="!activeTab || activeTab.isLoading">⟳</button>
-        <button @click="goHome" class="nav-btn" title="ホーム" :disabled="!activeTab || activeTab.isLoading">🏠</button>
-        <button @click="openInBrowser" class="nav-btn" title="ブラウザで開く">🔗</button>
-        <button @click="addNewTab" class="nav-btn" title="新しいタブ">+</button>
-        <button @click="openScrapboxTab" class="nav-btn scrapbox-btn" title="Scrapboxを開く">📝</button>
+      <div class="app-title">
+        <h1>🗂️ SBE - Scrapbox Desktop Manager</h1>
       </div>
-      <div class="url-bar">
-        <input 
-          v-model="urlInput" 
-          @keyup.enter="navigateActiveTab"
-          class="url-input"
-          placeholder="URLを入力してください"
-          :disabled="!activeTab || activeTab.isLoading"
-        />
-        <button @click="navigateActiveTab" class="go-btn" :disabled="!activeTab || activeTab.isLoading">
-          {{ activeTab?.isLoading ? '読み込み中...' : '移動' }}
+      <div class="quick-actions">
+        <button @click="openScrapboxHome" class="action-btn primary" :disabled="isLoading">
+          📝 Scrapboxを開く
+        </button>
+        <button @click="refreshData" class="action-btn" :disabled="isLoading">
+          ⟳ 更新
         </button>
       </div>
     </header>
 
-    <!-- Tab Bar -->
-    <div class="tab-bar" v-if="tabs.length > 0">
-      <div 
-        v-for="tab in tabs" 
-        :key="tab.id"
-        :class="['tab', { active: tab.id === activeTabId, loading: tab.isLoading }]"
-        @click="switchTab(tab.id)"
-      >
-        <span class="tab-favicon" v-if="tab.favicon">{{ tab.favicon }}</span>
-        <span class="tab-title">{{ tab.title }}</span>
-        <button 
-          @click.stop="closeTab(tab.id)" 
-          class="tab-close"
-          title="タブを閉じる"
-        >×</button>
+    <!-- Quick Launch Section -->
+    <div class="quick-launch">
+      <h2>🚀 クイックアクセス</h2>
+      <div class="launch-grid">
+        <button @click="openScrapboxProject('help-jp')" class="launch-item">
+          <div class="launch-icon">📖</div>
+          <div class="launch-title">Scrapbox ヘルプ</div>
+          <div class="launch-url">help-jp</div>
+        </button>
+        <button @click="openCustomProject" class="launch-item add-project">
+          <div class="launch-icon">➕</div>
+          <div class="launch-title">プロジェクトを追加</div>
+        </button>
       </div>
     </div>
     
     <main class="content-container">
-      <div v-if="activeTab" class="tab-content">
-        <div class="tab-info">
-          <div class="current-url">
-            現在のURL: <code>{{ activeTab.url }}</code>
-          </div>
-          
-          <div v-if="activeTab.isLoading" class="loading-message">
-            読み込み中...
-          </div>
-        </div>
-        
-        <!-- WebView content area -->
-        <div class="webview-container" :key="activeTab.id">
-          <iframe 
-            :src="activeTab.url"
-            class="webview-frame"
-            frameborder="0"
-            allowfullscreen
-            @error="handleIframeError(activeTab.id)"
-            @load="activeTab.isLoading = false"
-          ></iframe>
-          
-          <!-- Iframe alternative overlay -->
-          <div v-if="errorMessage && errorMessage.includes('iframe')" class="iframe-blocked-overlay">
-            <div class="blocked-content">
-              <h3>🚫 サイトが表示できません</h3>
-              <p>このサイトはセキュリティ上の理由でiframe内での表示が制限されています。</p>
-              <div class="alternative-actions">
-                <button @click="openTabInNewWindow(activeTab.id)" class="alt-btn">
-                  新しいウィンドウで開く
-                </button>
-                <button @click="openInBrowser" class="alt-btn">
-                  ブラウザで開く
-                </button>
-              </div>
+      <!-- Recent Windows Section -->
+      <div class="recent-section">
+        <h2>📋 最近開いたウィンドウ</h2>
+        <div v-if="recentWindows.length > 0" class="recent-list">
+          <div v-for="window in recentWindows" :key="window.id" class="recent-item" @click="reopenWindow(window)">
+            <div class="recent-info">
+              <div class="recent-title">{{ window.title }}</div>
+              <div class="recent-url">{{ window.url }}</div>
+              <div class="recent-time">{{ formatTime(window.lastAccessed) }}</div>
+            </div>
+            <div class="recent-actions" @click.stop>
+              <button @click="removeFromRecent(window.id)" class="recent-btn danger" title="削除">
+                🗑️
+              </button>
             </div>
           </div>
         </div>
+        <div v-else class="no-recent">
+          <p>まだウィンドウを開いていません</p>
+        </div>
       </div>
-      
-      <div v-else class="no-tabs">
-        <h2>SBE - Scrapbox Desktop Client</h2>
-        <p>新しいタブを作成してScrapboxを使い始めましょう。</p>
-        <button @click="addNewTab" class="create-tab-btn">最初のタブを作成</button>
+
+      <!-- Favorites Section -->
+      <div class="favorites-section">
+        <h2>⭐ お気に入り</h2>
+        <div class="favorites-list">
+          <div v-for="favorite in favorites" :key="favorite.id" class="favorite-item" @click="openFavorite(favorite)">
+            <div class="favorite-info">
+              <div class="favorite-title">{{ favorite.title }}</div>
+              <div class="favorite-url">{{ favorite.url }}</div>
+            </div>
+            <div class="favorite-actions" @click.stop>
+              <button @click="removeFavorite(favorite.id)" class="favorite-btn danger" title="削除">
+                🗑️
+              </button>
+            </div>
+          </div>
+          <div class="add-favorite">
+            <input 
+              v-model="newFavoriteUrl" 
+              placeholder="ScrapboxプロジェクトURLを入力" 
+              class="favorite-input"
+              @keyup.enter="addFavorite"
+            >
+            <button @click="addFavorite" class="favorite-btn primary">追加</button>
+          </div>
+        </div>
       </div>
       
       <div v-if="errorMessage" class="error-message">
@@ -285,381 +321,397 @@ onMounted(async () => {
       <div class="instructions">
         <h3>使い方:</h3>
         <ul>
-          <li>📝 ボタンでScrapboxを専用WebViewウィンドウで開く（推奨）</li>
-          <li>+ ボタンで新しいタブを作成（テスト用）</li>
-          <li>タブをクリックして切り替え</li>
-          <li>× ボタンでタブを閉じる</li>
-          <li>URLを入力して「移動」でナビゲーション</li>
-          <li>🏠 ボタンでホームページに戻る</li>
-          <li>🔗 ボタンでデフォルトブラウザで開く</li>
+          <li>📝 ボタンでScrapboxメインページを専用ウィンドウで開く</li>
+          <li>クイックアクセスからよく使うプロジェクトを素早く開く</li>
+          <li>「最近開いたウィンドウ」から以前開いたページを再度開く</li>
+          <li>「お気に入り」にプロジェクトURLを登録してアクセスを簡単に</li>
+          <li>各項目をクリックして開く、🗑️ボタンで削除</li>
         </ul>
-        <p><strong>注意:</strong> ScrapboxはiFrame表示が制限されているため、📝ボタンで専用ウィンドウを使用してください。</p>
+        <p><strong>注意:</strong> Scrapboxは専用のWebViewウィンドウで表示されます。</p>
       </div>
     </main>
   </div>
 </template>
 
-<style>
+<style scoped>
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-body, html {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  height: 100%;
-  overflow: hidden;
-}
-
 .app-container {
+  width: 100%;
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100vw;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f8f9fa;
 }
 
+/* Header Styles */
 .app-header {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  background-color: #f5f5f5;
-  border-bottom: 1px solid #ddd;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-.nav-controls {
-  display: flex;
-  gap: 4px;
-}
-
-.nav-btn {
-  background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 6px 10px;
-  cursor: pointer;
-  font-size: 14px;
-  min-width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.nav-btn:hover {
-  background-color: #e9e9e9;
-  border-color: #999;
-}
-
-.nav-btn:active {
-  background-color: #ddd;
-}
-
-.scrapbox-btn {
-  background-color: #28a745;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border-color: #28a745;
-}
-
-.scrapbox-btn:hover {
-  background-color: #218838;
-  border-color: #1e7e34;
-}
-
-.url-bar {
-  flex: 1;
+  padding: 16px 24px;
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+}
+
+.app-title h1 {
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 12px;
   align-items: center;
 }
 
-.url-input {
-  flex: 1;
-  padding: 6px 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 14px;
-  height: 32px;
-  outline: none;
-}
-
-.url-input:focus {
-  border-color: #007acc;
-  box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
-}
-
-.go-btn {
-  background: #007acc;
+.action-btn {
+  background: #007bff;
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 6px 16px;
+  padding: 8px 16px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  height: 32px;
-  transition: background-color 0.2s;
-}
-
-.go-btn:hover {
-  background-color: #005a9e;
-}
-
-/* Tab Bar Styles */
-.tab-bar {
-  display: flex;
-  background-color: #e9e9e9;
-  border-bottom: 1px solid #ccc;
-  overflow-x: auto;
-  flex-shrink: 0;
-}
-
-.tab {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  border-right: 1px solid #ccc;
-  background-color: #f5f5f5;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  min-width: 180px;
-  max-width: 200px;
-  user-select: none;
-  position: relative;
-}
-
-.tab:hover {
-  background-color: #e0e0e0;
-}
-
-.tab.active {
-  background-color: #fff;
-  border-bottom: 2px solid #007acc;
-}
-
-.tab.loading {
-  opacity: 0.7;
-}
-
-.tab.loading::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #007acc, transparent);
-  animation: loading 1.5s infinite;
-}
-
-@keyframes loading {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(200%); }
-}
-
-.tab-favicon {
-  margin-right: 6px;
-  font-size: 14px;
-}
-
-.tab-title {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  color: #333;
-}
-
-.tab.active .tab-title {
-  font-weight: 500;
-}
-
-.tab-close {
-  background: none;
-  border: none;
-  color: #666;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 0;
-  margin-left: 8px;
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 3px;
   transition: all 0.2s;
 }
 
-.tab-close:hover {
-  background-color: #ff4444;
-  color: white;
+.action-btn:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
 }
 
+.action-btn.primary {
+  background: #28a745;
+}
+
+.action-btn.primary:hover {
+  background: #218838;
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Quick Launch Section */
+.quick-launch {
+  background: white;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.quick-launch h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #495057;
+}
+
+.launch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.launch-item {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.launch-item:hover {
+  border-color: #007bff;
+  background: #e7f3ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,123,255,0.15);
+}
+
+.launch-item.add-project {
+  border-color: #28a745;
+  color: #28a745;
+}
+
+.launch-item.add-project:hover {
+  border-color: #28a745;
+  background: #e8f5e8;
+}
+
+.launch-icon {
+  font-size: 24px;
+}
+
+.launch-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+}
+
+.launch-url {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+/* Content Container */
 .content-container {
   flex: 1;
-  overflow: hidden;
-  background-color: #fafafa;
   display: flex;
   flex-direction: column;
+  padding: 24px;
+  gap: 24px;
+  overflow-y: auto;
 }
 
-/* Tab Content Styles */
-.tab-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.tab-info {
-  padding: 12px 20px;
-  background-color: #f9f9f9;
-  border-bottom: 1px solid #ddd;
-  flex-shrink: 0;
-}
-
-.webview-container {
-  flex: 1;
-  margin: 0;
-  padding: 0;
-  background-color: #fff;
-  position: relative;
-  overflow: hidden;
-}
-
-.webview-frame {
-  width: 100%;
-  height: 100%;
-  border: none;
-  background-color: #fff;
-}
-
-.iframe-blocked-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.95);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-}
-
-.blocked-content {
-  text-align: center;
-  max-width: 400px;
-  padding: 32px;
-  background-color: white;
+/* Recent Windows Section */
+.recent-section {
+  background: white;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
-.blocked-content h3 {
-  color: #d32f2f;
+.recent-section h2 {
+  font-size: 16px;
+  font-weight: 600;
   margin-bottom: 16px;
-  font-size: 20px;
+  color: #495057;
 }
 
-.blocked-content p {
-  color: #666;
-  margin-bottom: 24px;
-  line-height: 1.5;
-}
-
-.alternative-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-.alt-btn {
-  background: #007acc;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 10px 16px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
-}
-
-.alt-btn:hover {
-  background-color: #005a9e;
-}
-
-.no-tabs {
-  flex: 1;
+.recent-list {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+.recent-item {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 40px;
-}
-
-.no-tabs h2 {
-  color: #333;
-  margin-bottom: 20px;
-  font-size: 28px;
-}
-
-.create-tab-btn {
-  background: #007acc;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 12px 24px;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 16px;
-  margin-top: 20px;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
 }
 
-.create-tab-btn:hover {
-  background-color: #005a9e;
+.recent-item:hover {
+  border-color: #007bff;
+  background: #f8f9ff;
 }
 
-.current-url {
-  margin: 0;
-  padding: 8px 0;
-  font-size: 13px;
-  color: #666;
+.recent-info {
+  flex: 1;
+  min-width: 0;
 }
 
-.current-url code {
-  color: #007acc;
+.recent-title {
   font-weight: 500;
+  font-size: 14px;
+  color: #212529;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-url {
+  font-size: 12px;
+  color: #6c757d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-time {
+  font-size: 11px;
+  color: #6c757d;
+}
+
+.recent-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.recent-btn {
+  background: none;
+  border: none;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.recent-btn:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.recent-btn.danger:hover {
+  background: #dc3545;
+  color: white;
+}
+
+.no-recent {
+  text-align: center;
+  color: #6c757d;
+  font-size: 14px;
+  padding: 20px;
+}
+
+/* Favorites Section */
+.favorites-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.favorites-section h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #495057;
+}
+
+.favorites-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.favorite-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.favorite-item:hover {
+  border-color: #28a745;
+  background: #f8fff8;
+}
+
+.favorite-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.favorite-title {
+  font-weight: 500;
+  font-size: 14px;
+  color: #212529;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.favorite-url {
+  font-size: 12px;
+  color: #6c757d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.favorite-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.favorite-btn {
+  background: none;
+  border: none;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.favorite-btn:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.favorite-btn.primary {
+  background: #007bff;
+  color: white;
+  padding: 6px 12px;
   font-size: 12px;
 }
 
-.error-message {
-  margin: 16px 0;
-  padding: 12px;
-  background-color: #ffeaea;
-  border: 1px solid #ffcccc;
+.favorite-btn.primary:hover {
+  background: #0056b3;
+}
+
+.favorite-btn.danger:hover {
+  background: #dc3545;
+  color: white;
+}
+
+.add-favorite {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e9ecef;
+}
+
+.favorite-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e9ecef;
   border-radius: 6px;
-  color: #d8000c;
+  font-size: 14px;
 }
 
-.loading-message {
-  padding: 8px 0;
-  color: #0066cc;
-  font-size: 13px;
+.favorite-input:focus {
+  outline: none;
+  border-color: #007bff;
 }
 
+/* Error Message */
+.error-message {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 12px 20px;
+  border-left: 4px solid #dc3545;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+/* Instructions */
 .instructions {
-  margin: 20px;
+  background: white;
+  border-radius: 12px;
   padding: 20px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  margin-top: auto;
 }
 
 .instructions h3 {
@@ -689,39 +741,51 @@ body, html {
   font-size: 13px;
 }
 
-.nav-btn:disabled,
-.go-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.url-input:disabled {
-  background-color: #f5f5f5;
-  cursor: not-allowed;
-}
-
-#greet-input {
-  margin-right: 5px;
-}
-
+/* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  :root {
+  .app-container {
+    background: #1a1a1a;
     color: #f6f6f6;
-    background-color: #2f2f2f;
   }
 
-  a:hover {
-    color: #24c8db;
+  .quick-launch,
+  .recent-section,
+  .favorites-section,
+  .instructions {
+    background: #2d2d2d;
+    color: #f6f6f6;
   }
 
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
+  .recent-item,
+  .favorite-item {
+    border-color: #444;
+    background: #2d2d2d;
   }
-  button:active {
-    background-color: #0f0f0f69;
+
+  .recent-item:hover {
+    background: #3d3d3d;
+    border-color: #007bff;
+  }
+
+  .favorite-item:hover {
+    background: #3d3d3d;
+    border-color: #28a745;
+  }
+
+  .favorite-input {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #f6f6f6;
+  }
+
+  .launch-item {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #f6f6f6;
+  }
+
+  .launch-item:hover {
+    background: #3d3d3d;
   }
 }
-
 </style>
