@@ -689,18 +689,78 @@ onUnmounted(() => {
 // Functions are used in template - no need to export in script setup
 </script>
 
+<style>
+/* Global CSS Variables for Dark/Light Mode */
+:root {
+  /* Light mode colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-muted: #868e96;
+  --border-color: #dee2e6;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --tab-active-bg: #007acc;
+  --tab-hover-bg: #f0f0f0;
+  --button-primary: #007acc;
+  --button-primary-hover: #0056b3;
+  --button-danger: #dc3545;
+  --button-danger-hover: #c82333;
+  --success-color: #28a745;
+  --error-color: #dc3545;
+}
+
+body, html {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dark mode colors */
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --bg-tertiary: #404040;
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --text-muted: #999999;
+    --border-color: #555555;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --tab-active-bg: #0084ff;
+    --tab-hover-bg: #333333;
+    --button-primary: #0084ff;
+    --button-primary-hover: #0066cc;
+    --button-danger: #ff4757;
+    --button-danger-hover: #ff3742;
+    --success-color: #2ed573;
+    --error-color: #ff4757;
+  }
+  
+  body, html {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+  }
+}
+</style>
+
 <style scoped>
 .app {
   display: flex;
   flex-direction: column;
   height: 100vh;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .tab-bar {
   display: flex;
-  background: #f5f5f5;
-  border-bottom: 1px solid #ddd;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   padding: 0;
   overflow-x: auto;
 }
@@ -709,19 +769,21 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   padding: 8px 16px;
-  border-right: 1px solid #ddd;
+  border-right: 1px solid var(--border-color);
   cursor: pointer;
   min-width: 120px;
-  background: white;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   transition: background-color 0.2s;
 }
 
 .tab:hover {
-  background: #f0f0f0;
+  background: var(--tab-hover-bg);
+  color: var(--text-primary);
 }
 
 .tab.active {
-  background: #007acc;
+  background: var(--tab-active-bg);
   color: white;
 }
 
@@ -767,10 +829,10 @@ onUnmounted(() => {
 }
 
 .error-message {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--error-color);
+  color: white;
   padding: 8px 16px;
-  border-bottom: 1px solid #ffcdd2;
+  border-bottom: 1px solid var(--error-color);
   font-size: 14px;
 }
 
@@ -784,6 +846,8 @@ onUnmounted(() => {
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .scrapbox-home-section {
@@ -796,7 +860,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding: 16px 32px;
-  background: linear-gradient(135deg, #007acc, #0056b3);
+  background: linear-gradient(135deg, var(--button-primary), var(--button-primary-hover));
   color: white;
   border: none;
   border-radius: 8px;
@@ -804,13 +868,13 @@ onUnmounted(() => {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 122, 204, 0.3);
+  box-shadow: 0 2px 8px var(--shadow);
 }
 
 .scrapbox-home-btn:hover {
-  background: linear-gradient(135deg, #0056b3, #004085);
+  background: linear-gradient(135deg, var(--button-primary-hover), #004085);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 122, 204, 0.4);
+  box-shadow: 0 4px 12px var(--shadow);
 }
 
 .scrapbox-home-btn:active {
@@ -832,17 +896,17 @@ onUnmounted(() => {
 
 .section h2 {
   margin: 0 0 16px 0;
-  color: #333;
+  color: var(--text-primary);
   font-size: 18px;
 }
 
 .favorite-instruction {
   padding: 12px;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   margin-bottom: 16px;
-  color: #6c757d;
+  color: var(--text-secondary);
   font-size: 14px;
   text-align: center;
 }
@@ -859,10 +923,18 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   margin-bottom: 8px;
-  background: white;
+  background: var(--bg-secondary);
+  transition: all 0.2s;
+}
+
+.window-item:hover, .favorite-item:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--button-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px var(--shadow);
 }
 
 .window-info, .favorite-info {
@@ -872,16 +944,17 @@ onUnmounted(() => {
 .window-title, .favorite-title {
   font-weight: 500;
   margin-bottom: 4px;
+  color: var(--text-primary);
 }
 
 .window-url, .favorite-url {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 13px;
   margin-bottom: 4px;
 }
 
 .window-time {
-  color: #999;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -985,6 +1058,8 @@ onUnmounted(() => {
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .scrapbox-header {
@@ -996,7 +1071,7 @@ onUnmounted(() => {
 
 .scrapbox-header h2 {
   margin: 0;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .scrapbox-controls {
@@ -1007,24 +1082,60 @@ onUnmounted(() => {
 
 .project-input {
   padding: 6px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   font-size: 14px;
   min-width: 150px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.project-input:focus {
+  outline: none;
+  border-color: var(--button-primary);
+  box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.2);
 }
 
 .sort-select {
   padding: 6px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
+  font-size: 14px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.sort-select:focus {
+  outline: none;
+  border-color: var(--button-primary);
+  box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.2);
+}
+
+.refresh-btn {
+  background: var(--button-primary);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
   font-size: 14px;
 }
 
+.refresh-btn:hover:not(:disabled) {
+  background: var(--button-primary-hover);
+}
+
+.refresh-btn:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+}
+
 .scrapbox-page-list {
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px var(--shadow);
+  border: 1px solid var(--border-color);
 }
 
 .page-header {
@@ -1032,11 +1143,11 @@ onUnmounted(() => {
   grid-template-columns: 2fr 1fr 1fr 1.5fr 1.5fr;
   gap: 16px;
   padding: 12px 16px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
   font-weight: 600;
   font-size: 14px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .scrapbox-page-item {
@@ -1044,13 +1155,13 @@ onUnmounted(() => {
   grid-template-columns: 2fr 1fr 1fr 1.5fr 1.5fr;
   gap: 16px;
   padding: 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-color);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .scrapbox-page-item:hover {
-  background: #f8f9fa;
+  background: var(--bg-tertiary);
 }
 
 .scrapbox-page-item:last-child {
@@ -1059,17 +1170,17 @@ onUnmounted(() => {
 
 .scrapbox-page-item .page-title {
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .page-views {
-  color: #666;
+  color: var(--text-secondary);
   text-align: right;
 }
 
 .page-links {
-  color: #666;
+  color: var(--text-secondary);
   text-align: right;
 }
 
@@ -1081,23 +1192,23 @@ onUnmounted(() => {
 
 .user-name {
   font-size: 12px;
-  color: #999;
+  color: var(--text-muted);
   font-family: monospace;
 }
 
 .loading-state, .empty-state {
   text-align: center;
   padding: 40px;
-  color: #666;
+  color: var(--text-muted);
 }
 
 .error-message {
-  background: #fee;
-  color: #c33;
+  background: var(--error-color);
+  color: white;
   padding: 12px;
   border-radius: 4px;
   margin-bottom: 16px;
-  border: 1px solid #fcc;
+  border: 1px solid var(--error-color);
 }
 
 /* WebView */
@@ -1110,13 +1221,13 @@ onUnmounted(() => {
 .webview-header {
   display: flex;
   padding: 8px;
-  background: #f5f5f5;
-  border-bottom: 1px solid #ddd;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   gap: 8px;
 }
 
 .navigate-btn {
-  background: #007acc;
+  background: var(--button-primary);
   color: white;
   border: none;
   padding: 6px 12px;
@@ -1125,7 +1236,7 @@ onUnmounted(() => {
 }
 
 .navigate-btn:hover {
-  background: #005999;
+  background: var(--button-primary-hover);
 }
 
 .webview-iframe {
