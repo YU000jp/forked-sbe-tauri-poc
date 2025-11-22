@@ -96,6 +96,20 @@ async fn update_recent_title(app: tauri::AppHandle, window_label: String, url: S
     Ok(())
 }
 
+// Command to add to favorites from WebView
+#[tauri::command]
+async fn add_to_favorites_from_webview(app: tauri::AppHandle, url: String, title: String) -> Result<(), String> {
+    println!("⭐ Adding to favorites from WebView: {} -> {}", title, url);
+    
+    // Emit event to main window to add to favorites
+    app.emit("add-to-favorites", FavoriteEvent {
+        url,
+        title,
+    }).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
 // Helper function to build cookie header from webview cookies
 fn build_cookie_header(cookies: Vec<Cookie<'static>>) -> String {
     cookies
@@ -176,6 +190,12 @@ async fn fetch_scrapbox_pages(
 #[derive(serde::Serialize, Clone)]
 struct NavigationEvent {
     window_label: String,
+    url: String,
+    title: String,
+}
+
+#[derive(serde::Serialize, Clone)]
+struct FavoriteEvent {
     url: String,
     title: String,
 }
@@ -289,7 +309,8 @@ pub fn run() {
             navigate_tab,
             track_navigation,
             update_recent_title,
-            fetch_scrapbox_pages
+            fetch_scrapbox_pages,
+            add_to_favorites_from_webview
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

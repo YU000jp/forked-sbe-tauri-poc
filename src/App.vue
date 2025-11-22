@@ -44,12 +44,8 @@
 
         <div class="section">
           <h2>⭐ お気に入り</h2>
-          <div class="add-favorite">
-            <input v-model="newFavoriteUrl" 
-                   placeholder="お気に入りに追加するURLを入力" 
-                   @keyup.enter="addFavorite"
-                   class="url-input" />
-            <button @click="addFavorite" class="add-btn">追加</button>
+          <div class="favorite-instruction">
+            📝 WebViewでScrapboxページを右クリックして「お気に入りに追加」で追加できます
           </div>
           <div v-if="favorites.length === 0" class="empty-state">
             お気に入りが登録されていません
@@ -252,9 +248,7 @@ const urlInput = ref("");
 // Manager data
 const recentWindows = ref<RecentWindow[]>([]);
 const favorites = ref<Favorite[]>([]);
-const newFavoriteUrl = ref("");
 
-// Project data
 // Scrapbox pages state
 const scrapboxProject = ref('help-jp');
 const scrapboxPages = ref<ScrapboxPage[]>([]);
@@ -542,23 +536,34 @@ const removeFromRecent = (windowId: string) => {
 };
 
 // Favorites functions
-const addFavorite = () => {
-  if (!newFavoriteUrl.value.trim()) return;
-  
+const addFavoriteFromWebView = async (url: string, title: string) => {
   try {
-    const url = new URL(newFavoriteUrl.value);
+    // Check if already exists
+    const existingFavorite = favorites.value.find(f => f.url === url);
+    if (existingFavorite) {
+      errorMessage.value = "すでにお気に入りに登録されています";
+      setTimeout(() => {
+        errorMessage.value = "";
+      }, 2000);
+      return;
+    }
+    
     const favorite: Favorite = {
       id: `fav-${Date.now()}`,
-      title: url.pathname.split('/').filter(p => p).pop() || url.hostname,
-      url: newFavoriteUrl.value
+      title,
+      url
     };
     
-    favorites.value.push(favorite);
-    newFavoriteUrl.value = "";
+    favorites.value.unshift(favorite);
     saveToStorage();
-    errorMessage.value = "";
+    errorMessage.value = `お気に入りに追加しました: ${title}`;
+    
+    setTimeout(() => {
+      errorMessage.value = "";
+    }, 3000);
   } catch (error) {
-    errorMessage.value = "有効なURLを入力してください";
+    console.error('Failed to add favorite from WebView:', error);
+    errorMessage.value = `お気に入りの追加に失敗しました: ${error}`;
   }
 };
 
@@ -673,6 +678,13 @@ onMounted(async () => {
     });
 
     console.log(`Navigation tracked: ${title} (${url})`);
+  });
+  
+  // Listen for add to favorites events from WebViews
+  await listen('add-to-favorites', (event: any) => {
+    console.log('📥 Received add-to-favorites event:', event.payload);
+    const { url, title } = event.payload;
+    addFavoriteFromWebView(url, title);
   });
 
   // Listen for title updates
@@ -811,6 +823,17 @@ onUnmounted(() => {
   margin: 0 0 16px 0;
   color: #333;
   font-size: 18px;
+}
+
+.favorite-instruction {
+  padding: 12px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  color: #6c757d;
+  font-size: 14px;
+  text-align: center;
 }
 
 .empty-state {
