@@ -558,7 +558,12 @@ const fetchScrapboxPages = async () => {
 const openScrapboxPage = async (page: ScrapboxPage) => {
   try {
     const url = `https://scrapbox.io/${scrapboxProject.value}/${encodeURIComponent(page.title)}`;
-    await createWebViewTab(url, `${page.title} - ${scrapboxProject.value}`);
+    
+    // Open in WebView window instead of tab
+    await invoke('create_webview_window', { 
+      url,
+      label: `scrapbox-page-${page.id}-${Date.now()}`
+    });
     
     addToRecent({
       id: `scrapbox-page-${page.id}`,
