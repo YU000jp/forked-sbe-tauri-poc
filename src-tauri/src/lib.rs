@@ -44,33 +44,6 @@ async fn create_webview_window(app: tauri::AppHandle, url: String, label: String
         .initialization_script(&format!(r#"
             console.log('🔧 Initializing navigation tracker for: {}');
             
-            // Wait for Tauri API to be available
-            function waitForTauriAPI(callback, maxAttempts = 20) {{
-                let attempts = 0;
-                
-                function checkAPI() {{
-                    attempts++;
-                    console.log('🔍 Checking Tauri API availability (attempt ' + attempts + ')');
-                    
-                    if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {{
-                        console.log('✅ Tauri API is available!');
-                        callback();
-                    }} else if (attempts < maxAttempts) {{
-                        console.log('⏳ Tauri API not ready, retrying in 200ms...');
-                        setTimeout(checkAPI, 200);
-                    }} else {{
-                        console.error('❌ Tauri API failed to load after ' + maxAttempts + ' attempts');
-                        console.log('Debug info:', {{
-                            __TAURI__: !!window.__TAURI__,
-                            core: window.__TAURI__ ? !!window.__TAURI__.core : false,
-                            invoke: window.__TAURI__ && window.__TAURI__.core ? !!window.__TAURI__.core.invoke : false
-                        }});
-                    }}
-                }}
-                
-                checkAPI();
-            }}
-            
             // Navigation tracking state
             let currentUrl = window.location.href;
             let currentTitle = document.title || window.location.hostname || 'Untitled';
@@ -79,8 +52,7 @@ async fn create_webview_window(app: tauri::AppHandle, url: String, label: String
             function trackNavigation(url, title, source) {{
                 console.log('🔄 Navigation tracked (' + source + '):', title, '→', url);
                 
-                if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {{
-                    console.log('📡 Sending to Rust:', {{ windowLabel: '{}', url: url, title: title }});
+                if (window.__TAURI__ && window.__TAURI__.core) {{
                     window.__TAURI__.core.invoke('track_navigation', {{
                         windowLabel: '{}',
                         url: url,
@@ -91,49 +63,49 @@ async fn create_webview_window(app: tauri::AppHandle, url: String, label: String
                         console.error('❌ Failed to track navigation:', err);
                     }});
                 }} else {{
-                    console.error('❌ Tauri API not available when trying to track navigation');
+                    console.error('❌ Tauri API not available');
                 }}
             }}
             
-            // Initialize tracking when Tauri API is ready
-            waitForTauriAPI(function() {{
-                console.log('🚀 Starting navigation tracking...');
-                
-                // Track initial page load
+            // Initialize tracking
+            console.log('🚀 Starting navigation tracking...');
+            
+            // Track initial page load
+            setTimeout(() => {{
                 trackNavigation(currentUrl, currentTitle, 'initialization');
+            }}, 100);
+            
+            // Start monitoring for changes
+            setInterval(() => {{
+                const newUrl = window.location.href;
+                const newTitle = document.title || window.location.hostname || 'Untitled';
                 
-                // Start monitoring for changes
-                setInterval(() => {{
-                    const newUrl = window.location.href;
-                    const newTitle = document.title || window.location.hostname || 'Untitled';
-                    
-                    if (newUrl !== currentUrl || newTitle !== currentTitle) {{
-                        trackNavigation(newUrl, newTitle, 'polling');
-                        currentUrl = newUrl;
-                        currentTitle = newTitle;
-                    }}
-                }}, 300);
-                
-                // Listen for browser navigation events
-                window.addEventListener('popstate', () => {{
-                    setTimeout(() => {{
-                        const url = window.location.href;
-                        const title = document.title || window.location.hostname || 'Untitled';
-                        trackNavigation(url, title, 'popstate');
-                        currentUrl = url;
-                        currentTitle = title;
-                    }}, 50);
-                }});
-                
-                window.addEventListener('hashchange', () => {{
+                if (newUrl !== currentUrl || newTitle !== currentTitle) {{
+                    trackNavigation(newUrl, newTitle, 'polling');
+                    currentUrl = newUrl;
+                    currentTitle = newTitle;
+                }}
+            }}, 300);
+            
+            // Listen for browser navigation events
+            window.addEventListener('popstate', () => {{
+                setTimeout(() => {{
                     const url = window.location.href;
                     const title = document.title || window.location.hostname || 'Untitled';
-                    trackNavigation(url, title, 'hashchange');
+                    trackNavigation(url, title, 'popstate');
                     currentUrl = url;
                     currentTitle = title;
-                }});
+                }}, 50);
             }});
-        "#, label, label, label))
+            
+            window.addEventListener('hashchange', () => {{
+                const url = window.location.href;
+                const title = document.title || window.location.hostname || 'Untitled';
+                trackNavigation(url, title, 'hashchange');
+                currentUrl = url;
+                currentTitle = title;
+            }});
+        "#, label, label))
         .build()
         .map_err(|e| e.to_string())?;
     
