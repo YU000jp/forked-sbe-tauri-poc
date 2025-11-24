@@ -150,10 +150,6 @@ This is an experimental Tauri-based trial implementation inspired by the origina
 
 This is a proof-of-concept project demonstrating Tauri's capabilities. Contributions and suggestions are welcome!
 
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## 🙏 Acknowledgments
 
 - [Tauri](https://tauri.app/) - For the amazing desktop application framework
