@@ -146,10 +146,6 @@ This is an experimental Tauri-based trial implementation inspired by the origina
 
 - **[SBE - Scrapbox in Electron](https://github.com/kondoumh/sbe)** - The original desktop application built with Electron
 
-## 🤝 Contributing
-
-This is a proof-of-concept project demonstrating Tauri's capabilities. Contributions and suggestions are welcome!
-
 ## 🙏 Acknowledgments
 
 - [Tauri](https://tauri.app/) - For the amazing desktop application framework
