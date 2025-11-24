@@ -5,8 +5,18 @@ let currentUrl = window.location.href;
 let currentTitle = document.title || window.location.hostname || 'Untitled';
 
 // Function to track navigation
-function trackNavigation(url, title, source) {
+function trackNavigation(source = 'unknown') {
+    const url = window.location.href;
+    const title = document.title || window.location.hostname || 'Untitled';
+    
+    // Skip if no change
+    if (url === currentUrl && title === currentTitle) return;
+    
     console.log('🔄 Navigation tracked (' + source + '):', title, '→', url);
+    
+    // Update state
+    currentUrl = url;
+    currentTitle = title;
     
     if (window.__TAURI__ && window.__TAURI__.core) {
         window.__TAURI__.core.invoke('track_navigation', {
@@ -27,40 +37,32 @@ function trackNavigation(url, title, source) {
 console.log('🚀 Starting navigation tracking...');
 
 // Track initial page load
-setTimeout(() => {
-    trackNavigation(currentUrl, currentTitle, 'initialization');
-}, 100);
+trackNavigation('initialization');
 
-// Start monitoring for changes
-setInterval(() => {
-    const newUrl = window.location.href;
-    const newTitle = document.title || window.location.hostname || 'Untitled';
-    
-    if (newUrl !== currentUrl || newTitle !== currentTitle) {
-        trackNavigation(newUrl, newTitle, 'polling');
-        currentUrl = newUrl;
-        currentTitle = newTitle;
-    }
-}, 300);
+// Listen for navigation events
+window.addEventListener('popstate', () => trackNavigation('popstate'));
+window.addEventListener('hashchange', () => trackNavigation('hashchange'));
 
-// Listen for browser navigation events
-window.addEventListener('popstate', () => {
-    setTimeout(() => {
-        const url = window.location.href;
-        const title = document.title || window.location.hostname || 'Untitled';
-        trackNavigation(url, title, 'popstate');
-        currentUrl = url;
-        currentTitle = title;
-    }, 50);
-});
+// Handle SPA navigation (for modern web apps like Scrapbox)
+const originalPushState = history.pushState;
+const originalReplaceState = history.replaceState;
 
-window.addEventListener('hashchange', () => {
-    const url = window.location.href;
-    const title = document.title || window.location.hostname || 'Untitled';
-    trackNavigation(url, title, 'hashchange');
-    currentUrl = url;
-    currentTitle = title;
-});
+history.pushState = function(...args) {
+    originalPushState.apply(this, args);
+    trackNavigation('pushState');
+};
+
+history.replaceState = function(...args) {
+    originalReplaceState.apply(this, args);
+    trackNavigation('replaceState');
+};
+
+// Monitor title changes (for dynamic title updates)
+let titleObserver;
+if (document.querySelector('title')) {
+    titleObserver = new MutationObserver(() => trackNavigation('titleChange'));
+    titleObserver.observe(document.querySelector('title'), { childList: true });
+}
 
 // Add to favorites functionality
 function addToFavorites() {
