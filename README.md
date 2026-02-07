@@ -67,7 +67,45 @@ A proof-of-concept desktop application built with Tauri 2.0, Vue 3, and Rust tha
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### For End Users - Download Pre-built Binaries
+
+Download the latest release for your platform from the [Releases page](https://github.com/YU000jp/forked-sbe-tauri-poc/releases):
+
+#### Windows
+1. Download `sbe-tauri-poc_0.1.0_x64_en-US.msi` or `sbe-tauri-poc_0.1.0_x64-setup.exe`
+2. Run the installer and follow the installation wizard
+3. Launch the application from the Start menu
+
+#### macOS
+1. Download the appropriate DMG for your Mac:
+   - Apple Silicon (M1/M2/M3): `sbe-tauri-poc_aarch64.dmg`
+   - Intel Mac: `sbe-tauri-poc_x64.dmg`
+2. Mount the DMG and drag the app to your Applications folder
+3. **Important**: Due to lack of notarization, you may need to run:
+   ```bash
+   xattr -r -d com.apple.quarantine /Applications/sbe-tauri-poc.app
+   ```
+   Or open via System Preferences > Security & Privacy > "Open Anyway"
+
+#### Linux
+Download either package:
+
+**Debian/Ubuntu (.deb)**
+```bash
+sudo dpkg -i sbe-tauri-poc_0.1.0_amd64.deb
+```
+
+**AppImage (distribution-independent)**
+```bash
+chmod +x sbe-tauri-poc_0.1.0_amd64.AppImage
+./sbe-tauri-poc_0.1.0_amd64.AppImage
+```
+
+---
+
+### For Developers - Build from Source
+
+#### Prerequisites
 - [Node.js](https://nodejs.org/) (v16 or later)
 - [Rust](https://rustup.rs/) (latest stable)
 - Platform-specific requirements:
@@ -75,11 +113,11 @@ A proof-of-concept desktop application built with Tauri 2.0, Vue 3, and Rust tha
   - **Windows**: Visual Studio Build Tools
   - **Linux**: WebKit2GTK development packages
 
-### Installation
+#### Installation
 ```bash
 # Clone the repository
-git clone https://github.com/kondoumh/sbe-tauri-poc.git
-cd sbe-tauri-poc
+git clone https://github.com/YU000jp/forked-sbe-tauri-poc.git
+cd forked-sbe-tauri-poc
 
 # Install dependencies
 npm install
@@ -88,7 +126,7 @@ npm install
 npm run tauri dev
 ```
 
-### Building for Production
+#### Building for Production
 ```bash
 # Build the application
 npm run tauri build
