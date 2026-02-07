@@ -36,7 +36,6 @@ jobs:
       - name: Get version and inputs
         id: get_version
         run: |
-          # Use workflow input tag if provided, else use tag from ref if present, else default
           if [ -n "${{ github.event.inputs.tag }}" ]; then
             echo "VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
           elif [[ $GITHUB_REF == refs/tags/* ]]; then
@@ -45,14 +44,12 @@ jobs:
             echo "VERSION=v0.1.0" >> $GITHUB_OUTPUT
           fi
 
-          # target commit/branch: prefer workflow input, else current SHA
           if [ -n "${{ github.event.inputs.target_commitish }}" ]; then
             echo "TARGET_COMMITISH=${{ github.event.inputs.target_commitish }}" >> $GITHUB_OUTPUT
           else
             echo "TARGET_COMMITISH=${GITHUB_SHA}" >> $GITHUB_OUTPUT
           fi
 
-          # prerelease flag (string 'true' or 'false')
           if [ -n "${{ github.event.inputs.prerelease }}" ]; then
             echo "PRERELEASE=${{ github.event.inputs.prerelease }}" >> $GITHUB_OUTPUT
           else
@@ -65,15 +62,12 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-
-            // Determine version from context.ref (refs/tags/...)
-            const version = (context.ref && context.ref.startsWith('refs/tags/')) 
-              ? context.ref.replace('refs/tags/', '') 
-              : 'v0.1.0';
+            const version = '${{ steps.get_version.outputs.VERSION }}';
+            const targetCommitish = '${{ steps.get_version.outputs.TARGET_COMMITISH }}';
+            const prerelease = '${{ steps.get_version.outputs.PRERELEASE }}' === 'true';
 
             let releaseNotes = '';
 
-            // Try to read RELEASE_NOTES.md if it exists
             try {
               releaseNotes = fs.readFileSync('RELEASE_NOTES.md', 'utf8');
             } catch (error) {
@@ -110,16 +104,14 @@ jobs:
               name: `SBEデスクトップアプリ ${version}`,
               body: releaseNotes,
               draft: false,
-              prerelease: true,
-              target_commitish: context.sha
+              prerelease: prerelease,
+              target_commitish: targetCommitish
             });
             
-            // Set step outputs so downstream jobs can reference them
-            core.setOutput('result', data.id);
-            core.setOutput('upload_url', data.upload_url);
-
+            console.log(`Created release with ID: ${data.id}`);
+            console.log(`Upload URL: ${data.upload_url}`);
+            
             return data.id;
-
   build-tauri:
     needs: create-release
     strategy:
