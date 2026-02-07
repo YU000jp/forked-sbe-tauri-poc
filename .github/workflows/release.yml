@@ -62,18 +62,14 @@ jobs:
       - name: Create Release
         id: create-release
         uses: actions/github-script@v7
-        env:
-          VERSION: ${{ steps.get_version.outputs.VERSION }}
-          TARGET_COMMITISH: ${{ steps.get_version.outputs.TARGET_COMMITISH }}
-          PRERELEASE: ${{ steps.get_version.outputs.PRERELEASE }}
         with:
           script: |
             const fs = require('fs');
-            const core = require('@actions/core');
 
-            const version = process.env.VERSION || 'v0.1.0';
-            const targetCommitish = process.env.TARGET_COMMITISH || context.sha;
-            const prerelease = (process.env.PRERELEASE === 'true');
+            // Determine version from context.ref (refs/tags/...)
+            const version = (context.ref && context.ref.startsWith('refs/tags/')) 
+              ? context.ref.replace('refs/tags/', '') 
+              : 'v0.1.0';
 
             let releaseNotes = '';
 
@@ -114,8 +110,8 @@ jobs:
               name: `SBEデスクトップアプリ ${version}`,
               body: releaseNotes,
               draft: false,
-              prerelease: prerelease,
-              target_commitish: targetCommitish
+              prerelease: true,
+              target_commitish: context.sha
             });
             
             // Set step outputs so downstream jobs can reference them
