@@ -51,29 +51,30 @@ jobs:
             try {
               releaseNotes = fs.readFileSync('RELEASE_NOTES.md', 'utf8');
             } catch (error) {
-              releaseNotes = `## SBEデスクトップアプリ ${version}
+              releaseNotes = `
+                ## SBEデスクトップアプリ ${version}
 
-初回リリースです。
+                初回リリースです。
 
-### 主な機能
-- Tauri 2.0 を使用した軽量デスクトップアプリ
-- Windows/macOS/Linux 対応
-- Scrapbox プロジェクトの閲覧機能
-- WebView による認証対応
-- お気に入り機能
-- ダークモード対応
+                ### 主な機能
+                - Tauri 2.0 を使用した軽量デスクトップアプリ
+                - Windows/macOS/Linux 対応
+                - Scrapbox プロジェクトの閲覧機能
+                - WebView による認証対応
+                - お気に入り機能
+                - ダークモード対応
 
-### プラットフォーム
-- Windows: .exe, .msi インストーラー
-- macOS: .dmg, .app バンドル
-- Linux: .deb, .AppImage
-
-### 注意事項
-- macOS: 公証未対応のため、初回起動時に以下のコマンドが必要な場合があります:
-  \`\`\`bash
-  xattr -r -d com.apple.quarantine /Applications/sbe-tauri-poc.app
-  \`\`\`
-`;
+                ### プラットフォーム
+                - Windows: .exe, .msi インストーラー
+                - macOS: .dmg, .app バンドル
+                - Linux: .deb, .AppImage
+                
+                ### 注意事項
+                - macOS: 公証未対応のため、初回起動時に以下のコマンドが必要な場合があります:
+                  \`\`\`bash
+                  xattr -r -d com.apple.quarantine /Applications/sbe-tauri-poc.app
+                  \`\`\`
+                `;
             }
             
             const { data } = await github.rest.repos.createRelease({
