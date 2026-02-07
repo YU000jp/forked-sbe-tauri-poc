@@ -1,10 +1,20 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (例: v1.2.3)。空の場合は GITHUB_REF のタグ、さらに無ければ v0.1.0 を使用します'
+        required: false
+        default: ''
+      prerelease:
+        description: 'prerelease にする場合は true（既定: true）'
+        required: false
+        default: 'true'
+      target_commitish:
+        description: 'リリース対象のコミット/ブランチ（空の場合はワークフロー実行時の SHA）'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -23,27 +33,47 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Get version
+      - name: Get version and inputs
         id: get_version
         run: |
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
+          # Use workflow input tag if provided, else use tag from ref if present, else default
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          elif [[ $GITHUB_REF == refs/tags/* ]]; then
             echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           else
             echo "VERSION=v0.1.0" >> $GITHUB_OUTPUT
+          fi
+
+          # target commit/branch: prefer workflow input, else current SHA
+          if [ -n "${{ github.event.inputs.target_commitish }}" ]; then
+            echo "TARGET_COMMITISH=${{ github.event.inputs.target_commitish }}" >> $GITHUB_OUTPUT
+          else
+            echo "TARGET_COMMITISH=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+          fi
+
+          # prerelease flag (string 'true' or 'false')
+          if [ -n "${{ github.event.inputs.prerelease }}" ]; then
+            echo "PRERELEASE=${{ github.event.inputs.prerelease }}" >> $GITHUB_OUTPUT
+          else
+            echo "PRERELEASE=true" >> $GITHUB_OUTPUT
           fi
       
       - name: Create Release
         id: create-release
         uses: actions/github-script@v7
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+          TARGET_COMMITISH: ${{ steps.get_version.outputs.TARGET_COMMITISH }}
+          PRERELEASE: ${{ steps.get_version.outputs.PRERELEASE }}
         with:
           script: |
             const fs = require('fs');
             const core = require('@actions/core');
 
-            // Determine version from context.ref (refs/tags/...)
-            const version = (context.ref && context.ref.startsWith('refs/tags/')) 
-              ? context.ref.replace('refs/tags/', '') 
-              : 'v0.1.0';
+            const version = process.env.VERSION || 'v0.1.0';
+            const targetCommitish = process.env.TARGET_COMMITISH || context.sha;
+            const prerelease = (process.env.PRERELEASE === 'true');
 
             let releaseNotes = '';
 
@@ -84,8 +114,8 @@ jobs:
               name: `SBEデスクトップアプリ ${version}`,
               body: releaseNotes,
               draft: false,
-              prerelease: true,
-              target_commitish: context.sha
+              prerelease: prerelease,
+              target_commitish: targetCommitish
             });
             
             // Set step outputs so downstream jobs can reference them
